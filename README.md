@@ -1,14 +1,11 @@
-HFT-Unity Simple Example
-========================
+HFT-Unity Players in Scene
+==========================
 
 This is a sample Unity3D game for the [HappyFunTimes party games system](http://greggman.github.io/HappyFunTimes).
 
 <img src="screenshot.png" />
 
-It simply shows spawning a sphere each time a player joins and controlling the position of the sphere
-but dragging your finger on the screen.
-
-If you just want to play go to http://superhappyfuntimes.net/game/unitysimpleexample
+This example shows using HappyFunTimes to control GameObjects that already exist in the scene.
 
 Cloning
 -------
