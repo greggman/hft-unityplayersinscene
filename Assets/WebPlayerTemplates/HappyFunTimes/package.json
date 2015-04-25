@@ -1,0 +1,14 @@
+{
+  "name": "Unity Players In Scene",
+  "description": "unity example with pre-existing GameObjects for players",
+  "version": "0.0.1",
+  "private": false,
+  "dependencies": {},
+  "happyFunTimes": {
+    "gameId": "unityplayersinscene",
+    "category": "example",
+    "gameType": "Unity3D",
+    "apiVersion": "1.7.0",
+    "minPlayers": 1
+  }
+}
