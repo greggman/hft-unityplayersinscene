@@ -56,6 +56,7 @@ requirejs([
   var statusElem = document.getElementById("gamestatus");
   var inputElem = document.getElementById("inputarea");
   var colorElem = document.getElementById("display");
+  var fullElem = document.getElementById("full");
   var client = new GameClient();
 
   CommonUI.setupStandardControllerUI(client, globals);
@@ -63,6 +64,10 @@ requirejs([
   var randInt = function(range) {
     return Math.floor(Math.random() * range);
   };
+
+  function to255(v) {
+    return v * 255 | 0;
+  }
 
   // Sends a move command to the game.
   //
@@ -75,16 +80,12 @@ requirejs([
     });
   };
 
-  // Pick a random color
-  var color =  'rgb(' + randInt(256) + "," + randInt(256) + "," + randInt(256) + ")";
-  // Send the color to the game.
-  //
-  // This will generate a 'color' event in the corresponding
-  // NetPlayer object in the game.
-  client.sendCmd('color', {
-    color: color,
+  // Set color to the color the game tells us to
+  client.addEventListener('color', function(data) {
+    var c = data.color;
+    var color = 'rgb(' + to255(c.r) + "," + to255(c.g) + "," + to255(c.b) + ")";
+    colorElem.style.backgroundColor = color;
   });
-  colorElem.style.backgroundColor = color;
 
   // Send a message to the game when the screen is touched
   inputElem.addEventListener('pointermove', function(event) {
@@ -97,6 +98,16 @@ requirejs([
   client.addEventListener('scored', function(cmd) {
     score += cmd.points;
     statusElem.innerHTML = "You scored: " + cmd.points + " total: " + score;
+  });
+
+  // Show the "full" message when we get this message
+  client.addEventListener('full', function() {
+    fullElem.style.display = "block";
+  });
+
+  // Hide the "full" message when we start playing
+  client.addEventListener('play', function() {
+    fullElem.style.display = "none";
   });
 });
 

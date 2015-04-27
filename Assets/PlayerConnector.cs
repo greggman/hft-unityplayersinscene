@@ -43,8 +43,7 @@ public class PlayerConnector : MonoBehaviour
     public string gameId = "";
     public bool showMessages = false;
     public bool allowMultipleGames;
-    public bool reconnectPlayers = false;
-    public int timeoutForDisconnectedPlayersToReconnect = 15;
+    public int timeoutForDisconnectedPlayersToReconnect = 0;
 
     public GameServer server
     {
@@ -95,7 +94,7 @@ public class PlayerConnector : MonoBehaviour
         PlayerState playerState = GetPlayerState(netPlayer);
         if (playerState != null) {
             playerState.netPlayer = null;
-
+            playerState.disconnectTime = Time.time;
             StartWaitingPlayers();
         }
     }
@@ -130,6 +129,16 @@ public class PlayerConnector : MonoBehaviour
         }
     }
 
+    void SendSpawnInfoToGameObject(string msg, GameObject gameObject, NetPlayerState netPlayerState) {
+        string name = netPlayerState.name;
+
+        SpawnInfo spawnInfo = new SpawnInfo();
+        spawnInfo.netPlayer = netPlayerState.netPlayer;
+        spawnInfo.name = !String.IsNullOrEmpty(name) ? name : ("Player" + (++m_count));
+        spawnInfo.data = netPlayerState.data;
+        gameObject.SendMessage(msg, spawnInfo);
+    }
+
     void StartActivePlayer(GameObject gameObject, PlayerState playerState, NetPlayerState netPlayerState) {
         m_activePlayers.Add(netPlayerState);
 
@@ -138,35 +147,9 @@ public class PlayerConnector : MonoBehaviour
         netPlayer.OnDisconnect += RemoveNetPlayer;
 
         playerState.netPlayer = netPlayer;
+        playerState.id = netPlayer.GetSessionId();
 
-//        // Find disconnected slot
-//        int pndx;
-//        PlayerState playerState = null;
-//        for (pndx = 0; pndx < m_playerState.Length; ++pndx) {
-//            playerState = m_playerState[pndx];
-//            if (playerState.netPlayer == null) {
-//                break;
-//            }
-//        }
-//
-//        if (pndx >= m_playerState.Length) {
-//            // Game is Full. Send Message to Phone
-//
-//            // Track the user's name because they might set it while they are waiting to play
-//            netPlayer.RegisterCmdHandler<MessageSetName>(delegate(MessageSetName msgdata) {
-//                SetNetPlayerName(netPlayer, msgdata);
-//            });
-//
-//            return;
-//        }
-
-        string name = netPlayerState.name;
-
-        SpawnInfo spawnInfo = new SpawnInfo();
-        spawnInfo.netPlayer = netPlayer;
-        spawnInfo.name = !String.IsNullOrEmpty(name) ? name : ("Player" + (++m_count));
-        spawnInfo.data = netPlayerState.data;
-        gameObject.SendMessage("InitializeNetPlayer", spawnInfo);
+        SendSpawnInfoToGameObject("InitializeNetPlayer", gameObject, netPlayerState);
     }
 
     NetPlayerState DequeFirstWaitingPlayer() {
@@ -177,11 +160,16 @@ public class PlayerConnector : MonoBehaviour
         return netPlayerState;
     }
 
+    bool SlotCanAcceptNewPlayer(PlayerState playerState) {
+        return playerState.netPlayer == null &&
+               Time.time - playerState.disconnectTime > timeoutForDisconnectedPlayersToReconnect;
+    }
+
     public void StartWaitingPlayers() {
         if (m_waitingPlayers.Count > 0) {
             for (int pndx = 0; pndx < m_playerState.Length; ++pndx) {
                 PlayerState playerState = m_playerState[pndx];
-                if (playerState.netPlayer == null) {
+                if (SlotCanAcceptNewPlayer(playerState)) {
                     NetPlayerState netPlayerState = DequeFirstWaitingPlayer();
                     if (netPlayerState == null) {
                         return;
@@ -200,12 +188,31 @@ public class PlayerConnector : MonoBehaviour
         });
         netPlayer.OnDisconnect += RemoveNetPlayer;
         m_waitingPlayers.Add(netPlayerState);
+
+        SendSpawnInfoToGameObject("WaitingNetPlayer", gameObject, netPlayerState);
     }
 
     void StartNewPlayer(object sender, PlayerConnectMessageArgs e)
     {
-        // Add player to list of all people conncted
-        AddWaitingPlayer(new NetPlayerState(e.netPlayer, "", e.data));
+        NetPlayerState netPlayerState = new NetPlayerState(e.netPlayer, "", e.data);
+        string id = e.netPlayer.GetSessionId();
+        if (id.Length > 0) {
+            // Check if there is a slot with this id
+            for (int pndx = 0; pndx < m_playerState.Length; ++pndx) {
+                PlayerState playerState = m_playerState[pndx];
+                if (playerState.id == id) {
+                    if (playerState.netPlayer == null) {
+                        StartActivePlayer(players[pndx], playerState, netPlayerState);
+                        return;
+                    } else {
+                        Debug.LogError("Player it same ID join but they're already playing???");
+                    }
+                }
+            }
+        }
+
+        // Add player to list of all people connected
+        AddWaitingPlayer(netPlayerState);
         StartWaitingPlayers();
     }
 
@@ -218,8 +225,7 @@ public class PlayerConnector : MonoBehaviour
     /// <summary>
     /// Call this to rotate an active player out and start the next waiting player.
     /// </summary>
-    /// <param name="sender"></param>
-    /// <param name="e"></param>
+    /// <param name="netPlayer">The NetPlayer of the player to return</param>
     /// <returns></returns>
     public void ReturnPlayer(NetPlayer netPlayer) {
         NetPlayerState netPlayerState = GetActiveNetPlayerState(netPlayer);
@@ -237,6 +243,8 @@ public class PlayerConnector : MonoBehaviour
         PlayerState playerState = GetPlayerState(netPlayer);
         if (playerState != null) {
             playerState.netPlayer = null;
+            // Make the slot available immediately.
+            playerState.disconnectTime = Time.time - timeoutForDisconnectedPlayersToReconnect;
 
             StartWaitingPlayers();
         }
@@ -248,7 +256,7 @@ public class PlayerConnector : MonoBehaviour
     /// </summary>
     /// <param name=""></param>
     /// <returns></returns>
-    public void GetNewPlayers() {
+    public void FlushCurrentPlayers() {
         for (int pndx = 0; pndx < m_playerState.Length; ++pndx) {
             PlayerState playerState = m_playerState[pndx];
             if (playerState.netPlayer != null) {
@@ -260,7 +268,9 @@ public class PlayerConnector : MonoBehaviour
     void ResetState() {
         m_playerState = new PlayerState[players.Length];
         for (int ii = 0; ii < m_playerState.Length; ++ii) {
-            m_playerState[ii] = new PlayerState();
+            PlayerState playerState = new PlayerState();
+            playerState.disconnectTime = Time.time - timeoutForDisconnectedPlayersToReconnect;
+            m_playerState[ii] = playerState;
         }
     }
 
@@ -268,6 +278,18 @@ public class PlayerConnector : MonoBehaviour
     {
         ResetState();
         StartConnection();
+    }
+
+    void Update() {
+        if (m_waitingPlayers.Count > 0) {
+            for (int pndx = 0; pndx < m_playerState.Length; ++pndx) {
+                PlayerState playerState = m_playerState[pndx];
+                if (SlotCanAcceptNewPlayer(playerState)) {
+                    StartWaitingPlayers();
+                    return;
+                }
+            }
+        }
     }
 
     void Connected(object sender, EventArgs e)
@@ -301,6 +323,7 @@ public class PlayerConnector : MonoBehaviour
     class PlayerState {
         public string id = "";
         public NetPlayer netPlayer;
+        public float disconnectTime;
     };
 
     // The state of NetPlayers (people with phones).

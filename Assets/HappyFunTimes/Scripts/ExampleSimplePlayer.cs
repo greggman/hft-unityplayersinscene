@@ -3,15 +3,15 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using HappyFunTimes;
-using CSSParse;
 
 namespace HappyFunTimesExample {
 
 class ExampleSimplePlayer : MonoBehaviour {
-    // Classes based on MessageCmdData are automatically registered for deserialization
-    // by CmdName.
     private class MessageColor : MessageCmdData {
-        public string color = "";    // in CSS format rgb(r,g,b)
+        public MessageColor(Color _color) {
+            color = _color;
+        }
+        public Color color;
     };
 
     private class MessageMove : MessageCmdData {
@@ -52,7 +52,6 @@ class ExampleSimplePlayer : MonoBehaviour {
         m_netPlayer.OnDisconnect += Disconnected;
 
         // Setup events for the different messages.
-        m_netPlayer.RegisterCmdHandler<MessageColor>("color", OnColor);
         m_netPlayer.RegisterCmdHandler<MessageMove>("move", OnMove);
         m_netPlayer.RegisterCmdHandler<MessageSetName>("setName", OnSetName);
         m_netPlayer.RegisterCmdHandler<MessageBusy>("busy", OnBusy);
@@ -61,13 +60,18 @@ class ExampleSimplePlayer : MonoBehaviour {
         m_position = new Vector3(m_rand.Next(settings.areaWidth), 0, m_rand.Next(settings.areaHeight));
         transform.localPosition = m_position;
 
+        // Tell controller to go to play mode (it was in in waiting mode)
+        m_netPlayer.SendCmd("play");
+
+        // Tell controller what color
+        m_netPlayer.SendCmd("color", new MessageColor(m_renderer.material.color));
+
         SetName(spawnInfo.name);
     }
 
     void Start() {
         m_renderer = gameObject.GetComponent<Renderer>();
         m_position = gameObject.transform.localPosition;
-        m_color = new Color(0.0f, 1.0f, 0.0f);
     }
 
     public void Update() {
@@ -84,11 +88,6 @@ class ExampleSimplePlayer : MonoBehaviour {
 
     private void Disconnected(object sender, EventArgs e) {
         // I don't think we need to do anything?
-    }
-
-    private void OnColor(MessageColor data) {
-        m_color = CSSParse.Style.ParseCSSColor(data.color);
-        m_renderer.material.color = m_color;
     }
 
     private void OnMove(MessageMove data) {
@@ -115,7 +114,6 @@ class ExampleSimplePlayer : MonoBehaviour {
     private NetPlayer m_netPlayer;
     private Renderer m_renderer;
     private Vector3 m_position;
-    private Color m_color;
     private string m_name;
 }
 
