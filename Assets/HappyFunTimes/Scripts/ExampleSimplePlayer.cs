@@ -19,19 +19,6 @@ class ExampleSimplePlayer : MonoBehaviour {
         public float y = 0;
     };
 
-    private class MessageSetName : MessageCmdData {
-        public MessageSetName() {  // needed for deserialization
-        }
-        public MessageSetName(string _name) {
-            name = _name;
-        }
-        public string name = "";
-    };
-
-    private class MessageBusy : MessageCmdData {
-        public bool busy = false;
-    }
-
     // NOTE: This message is only sent, never received
     // therefore it does not need a no parameter constructor.
     // If you do receive one you'll get an error unless you
@@ -50,11 +37,10 @@ class ExampleSimplePlayer : MonoBehaviour {
 
         // Register handler to call if the player disconnects from the game.
         m_netPlayer.OnDisconnect += Disconnected;
+        m_netPlayer.OnNameChange += ChangeName;
 
         // Setup events for the different messages.
         m_netPlayer.RegisterCmdHandler<MessageMove>("move", OnMove);
-        m_netPlayer.RegisterCmdHandler<MessageSetName>("setName", OnSetName);
-        m_netPlayer.RegisterCmdHandler<MessageBusy>("busy", OnBusy);
 
         ExampleSimpleGameSettings settings = ExampleSimpleGameSettings.settings();
         m_position = new Vector3(m_rand.Next(settings.areaWidth), 0, m_rand.Next(settings.areaHeight));
@@ -66,19 +52,48 @@ class ExampleSimplePlayer : MonoBehaviour {
         // Tell controller what color
         m_netPlayer.SendCmd("color", new MessageColor(m_renderer.material.color));
 
-        SetName(spawnInfo.name);
+        SetName(m_netPlayer.Name);
     }
 
-    void Start() {
+    void Start()
+    {
         m_renderer = gameObject.GetComponent<Renderer>();
         m_position = gameObject.transform.localPosition;
     }
 
-    public void Update() {
+    void Update()
+    {
+    }
+
+    void OnGUI()
+    {
+        Vector2 size = m_guiStyle.CalcSize(m_guiName);
+        Vector3 coords = Camera.main.WorldToScreenPoint(transform.position);
+        m_nameRect.x = coords.x - size.x * 0.5f - 5.0f;
+        m_nameRect.y = Screen.height - coords.y - 30.0f;
+        GUI.Box(m_nameRect, m_name, m_guiStyle);
     }
 
     private void SetName(string name) {
         m_name = name;
+        gameObject.name = "Player-" + m_name;
+        m_guiName = new GUIContent(m_name);
+        m_guiStyle.normal.textColor = Color.black;
+        m_guiStyle.contentOffset = new Vector2(4.0f, 2.0f);
+        Vector2 size = m_guiStyle.CalcSize(m_guiName);
+        m_nameRect.width  = size.x + 12;
+        m_nameRect.height = size.y + 5;
+        SetColor(new Color(1.0f, 1.0f, 1.0f, 1.0f));
+    }
+
+    void SetColor(Color color)
+    {
+        Color[] pix = new Color[1];
+        pix[0] = color;
+        Texture2D tex = new Texture2D(1, 1);
+        tex.SetPixels(pix);
+        tex.Apply();
+        m_guiStyle.normal.background = tex;
     }
 
     public void OnTriggerEnter(Collider other) {
@@ -98,16 +113,8 @@ class ExampleSimplePlayer : MonoBehaviour {
         gameObject.transform.localPosition = m_position;
     }
 
-    private void OnSetName(MessageSetName data) {
-        if (data.name.Length == 0) {
-            m_netPlayer.SendCmd("setName", new MessageSetName(m_name));
-        } else {
-            SetName(data.name);
-        }
-    }
-
-    private void OnBusy(MessageBusy data) {
-        // not used.
+    private void ChangeName(object sender, EventArgs e) {
+        SetName(m_netPlayer.Name);
     }
 
     private System.Random m_rand = new System.Random();
@@ -115,6 +122,9 @@ class ExampleSimplePlayer : MonoBehaviour {
     private Renderer m_renderer;
     private Vector3 m_position;
     private string m_name;
+    private GUIStyle m_guiStyle = new GUIStyle();
+    private GUIContent m_guiName = new GUIContent("");
+    private Rect m_nameRect = new Rect(0,0,0,0);
 }
 
 }  // namespace HappyFunTimesExample
