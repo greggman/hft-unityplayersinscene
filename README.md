@@ -3,7 +3,7 @@ HFT-Unity Players in Scene
 
 This is a sample Unity3D game for the [HappyFunTimes party games system](http://greggman.github.io/HappyFunTimes).
 
-<img src="screenshot.png" />
+<img src="Assets/WebPlayerTemplates/HappyFunTimes/screenshot.png" />
 
 This example shows using HappyFunTimes to control GameObjects that already exist in the scene.
 
