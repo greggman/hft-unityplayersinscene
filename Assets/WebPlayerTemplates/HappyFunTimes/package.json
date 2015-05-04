@@ -1,7 +1,7 @@
 {
   "name": "Unity Players In Scene",
   "description": "unity example with pre-existing GameObjects for players",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": false,
   "dependencies": {},
   "happyFunTimes": {
